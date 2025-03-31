@@ -1,3 +1,4 @@
+import os
 import re
 import asyncio
 
@@ -100,6 +101,7 @@ class SpotifyDownloaderFacade:
         try:
             input_file = types.FSInputFile(output_file)
             await bot.send_audio(chat_id, audio=input_file)
+            await asyncio.to_thread(os.remove, output_file)
             return output_file
         except FileNotFoundError:
             await bot.send_message(chat_id, "Ошибка при отправке файла.")
