@@ -105,7 +105,11 @@ class SpotifyDownloaderFacade:
             track_name = track_info[2]
             logger.info('Song is %s and download link is %s', output_file, song_link)
             await create_new_track(track_id, song_link, artist_name, track_name, output_file)
-        await self.__class__.downloading_song(song_link, output_file)
+        try:
+            await self.__class__.downloading_song(song_link, output_file)
+        except Exception as e:
+            logger.info('Download failed %s', str(e))
+            await bot.send_message(chat_id, 'Произошла ошибка при скачивании файла. Повторите попытку!!')
         await asyncio.sleep(2)
         try:
             input_file = types.FSInputFile(output_file)
