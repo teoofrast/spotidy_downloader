@@ -8,7 +8,7 @@ from aiogram import types
 
 from logger_file import setup_logger
 
-logger = setup_logger(__name__)
+logger = setup_logger(__name__, )
 
 class SpotifyDownloaderFacade:
     __slots__ = ('rapidapi_key',)
