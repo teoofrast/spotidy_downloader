@@ -48,12 +48,7 @@ class SpotifyDownloaderFacade:
     async def get_track_name_async(self, track_url, client_id, client_secret):
         """Асинхронно получает название трека по ссылке на Spotify."""
 
-        # Извлекаем ID трека из URL
-        track_id = re.search(r'track/([a-zA-Z0-9]+)', track_url)
-        if not track_id:
-            return None
-
-        track_id = track_id.group(1)
+        track_id = await asyncio.to_thread(get_track_id, track_url)
 
         # Аутентификация
         auth_url = 'https://accounts.spotify.com/api/token'
@@ -79,17 +74,17 @@ class SpotifyDownloaderFacade:
                 track_info = track_response.json()
                 track_name = track_info['name']
                 artists = ', '.join([artist['name'] for artist in track_info['artists']])
-                full_track_name = f"{artists} - {track_name}"
+                full_track_name = f"{artists} - {track_name}.mp3"
                 return full_track_name
 
             except httpx.HTTPStatusError as e:
-                print(f"Ошибка HTTP: {e}")
+                logger.error('Ошибка HTTP: %s', e)
                 return None
             except httpx.RequestError as e:
-                print(f"Ошибка запроса: {e}")
+                logger.error('Ошибка запроса: %s', e)
                 return None
-            except KeyError:
-                print("Ошибка при разборе JSON ответа.")
+            except KeyError as e:
+                logger.error('Ошибка при разборе JSON ответа %s', e)
                 return None
 
     async def get_mp3(self, song_id: str, client_id, client_secret, bot, chat_id):
@@ -110,3 +105,13 @@ class SpotifyDownloaderFacade:
             logger.error('Error sending audio: %s', str(e))
             await bot.send_message(chat_id, "Произошла ошибка при отправке файла.")
             return None
+
+
+def get_track_id(track_url: str,):
+    # Извлекаем ID трека из URL
+    track_id = re.search(r'track/([a-zA-Z0-9]+)', track_url)
+    if not track_id:
+        return None
+
+    track_id = track_id.group(1)
+    return track_id
