@@ -7,8 +7,9 @@ import httpx
 from aiogram import types
 
 from logger_file import setup_logger
+from DAO import *
 
-logger = setup_logger(__name__, )
+logger = setup_logger(__name__)
 
 class SpotifyDownloaderFacade:
     __slots__ = ('rapidapi_key',)
@@ -45,10 +46,9 @@ class SpotifyDownloaderFacade:
                 raise e
             return True
 
-    async def get_track_name_async(self, track_url, client_id, client_secret):
+    async def get_track_name_async(self, track_url, track_id, client_id, client_secret):
         """Асинхронно получает название трека по ссылке на Spotify."""
 
-        track_id = await asyncio.to_thread(get_track_id, track_url)
 
         # Аутентификация
         auth_url = 'https://accounts.spotify.com/api/token'
@@ -73,9 +73,10 @@ class SpotifyDownloaderFacade:
                 track_response.raise_for_status()
                 track_info = track_response.json()
                 track_name = track_info['name']
+                artist_name = track_info['artists'][0]['name']
                 artists = ', '.join([artist['name'] for artist in track_info['artists']])
                 full_track_name = f"{artists} - {track_name}.mp3"
-                return full_track_name
+                return full_track_name, artist_name, track_name
 
             except httpx.HTTPStatusError as e:
                 logger.error('Ошибка HTTP: %s', e)
@@ -88,23 +89,35 @@ class SpotifyDownloaderFacade:
                 return None
 
     async def get_mp3(self, song_id: str, client_id, client_secret, bot, chat_id):
-        song_link = await self.fetch_song_data(song_id)
-        output_file = await self.get_track_name_async(song_id, client_id, client_secret)
-        logger.info('Song is %s', output_file)
-        mp3 = await self.__class__.downloading_song(song_link, output_file)
-        await asyncio.sleep(10)
+        track_id = await asyncio.to_thread(get_track_id, song_id)
+        logger.info('The track id is %s', track_id)
+        track = await get_track(track_id)
+        logger.info('The track is %s, and the type of track is %s', track, type(track))
+        if track is not None:
+            logger.info('Get data from database %s', track)
+            song_link = track.song_link
+            output_file = track.full_track_name
+        else:
+            song_link = await self.fetch_song_data(song_id)
+            track_info = await self.get_track_name_async(song_id, track_id, client_id, client_secret)
+            output_file = track_info[0]
+            artist_name = track_info[1]
+            track_name = track_info[2]
+            logger.info('Song is %s and download link is %s', output_file, song_link)
+            await create_new_track(track_id, song_link, artist_name, track_name, output_file)
+        await self.__class__.downloading_song(song_link, output_file)
+        await asyncio.sleep(2)
         try:
             input_file = types.FSInputFile(output_file)
             await bot.send_audio(chat_id, audio=input_file)
             await asyncio.to_thread(os.remove, output_file)
-            return output_file
+
         except FileNotFoundError:
             await bot.send_message(chat_id, "Ошибка при отправке файла.")
-            return None
+
         except Exception as e:
             logger.error('Error sending audio: %s', str(e))
             await bot.send_message(chat_id, "Произошла ошибка при отправке файла.")
-            return None
 
 
 def get_track_id(track_url: str,):

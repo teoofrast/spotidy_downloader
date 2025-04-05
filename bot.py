@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 
 from downloader import SpotifyDownloaderFacade
 from logger_file import setup_logger
+from database import initialize_database, create_db_engine
+from models import init_db
 
 load_dotenv()
 logger = setup_logger(__name__)
@@ -58,6 +60,9 @@ async def download_song(message: Message) -> None:
 
 
 async def main() -> None:
+    await initialize_database()
+    engine = await create_db_engine()
+    await init_db(engine)
     await dp.start_polling(bot)
 
 
